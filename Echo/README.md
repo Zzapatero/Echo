@@ -8,6 +8,7 @@ Echo es una aplicación de mensajería en tiempo real construida en Java. Mantie
 - Registro e inicio de sesión desde la interfaz.
 - Claves almacenadas con PBKDF2 y una sal aleatoria. Las cuentas heredadas se migran al iniciar el servidor y deben elegir una clave nueva en su siguiente acceso.
 - Búsqueda de personas registradas con indicador de conexión.
+- Fotos de perfil PNG/JPEG con recorte cuadrado, guardadas localmente en `profile-photos/` y asociadas a cada cuenta.
 - Mensajes privados a personas conectadas o desconectadas. Los pendientes se guardan y se confirman al recibirlos.
 - Historial de canales guardado en CSV.
 - Interfaz web adaptable con buscador de personas, presencia y canales.
@@ -17,7 +18,7 @@ Echo es una aplicación de mensajería en tiempo real construida en Java. Mantie
 
 El servidor TCP escucha en `127.0.0.1:5000` y atiende cada conexión en su propio hilo. El servidor HTTP local sirve la interfaz en `127.0.0.1:8080`; cada navegador conserva una sesión TCP y la web consulta los eventos periódicamente. Los comandos de protocolo se traducen a acciones de usuarios, canales y mensajes. Los CSV locales almacenan las cuentas y el historial; los mensajes privados pendientes se guardan hasta confirmar su entrega.
 
-La web y el servidor solo escuchan en loopback, por lo que Echo está pensado para usarse en el mismo equipo. Para acceso remoto haría falta añadir TLS. La aplicación no requiere frameworks, dependencias externas ni recursos de CDN. El JAR incluido en `lib/` se usa únicamente para las pruebas existentes.
+La web y el servidor solo escuchan en loopback, por lo que Echo está pensado para usarse en el mismo equipo. Para acceso remoto haría falta añadir TLS. Las imágenes se limitan a PNG/JPEG de hasta 4 MB, se normalizan a miniaturas cuadradas de 512 px y no se guardan en Git. La aplicación no requiere frameworks, dependencias externas ni recursos de CDN. El JAR incluido en `lib/` se usa únicamente para las pruebas existentes.
 
 ## Requisitos
 

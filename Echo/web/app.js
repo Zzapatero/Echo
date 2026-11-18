@@ -20,6 +20,9 @@
     activeType: null,
     activeName: null,
     people: [],
+    avatarMissing: new Map(),
+    avatarVersions: new Map(),
+    avatarCacheBust: 0,
     messages: new Map(),
     pendingPrivate: new Map(),
     polling: false,
@@ -284,7 +287,10 @@
     chatApp.classList.remove('hidden');
     chatApp.classList.remove('mobile-chat-open');
     byId('userName').textContent = state.username;
-    byId('userAvatar').textContent = initials(state.username);
+    state.avatarMissing.clear();
+    state.avatarVersions.clear();
+    state.avatarCacheBust = Date.now();
+    setAvatarImage(byId('profilePhotoButton'), state.username, initials(state.username), byId('userAvatar'), byId('userAvatarImage'), true);
     setNotice(authNotice, '');
     void sendCommand('LIST_USERS').catch(error => showToast(error.message, true));
     selectConversation('room:General', 'room', 'General');
@@ -309,7 +315,12 @@
     byId('activeConversation').classList.remove('hidden');
     const channel = channels.find(item => item.name === name);
     byId('conversationName').textContent = name;
-    byId('conversationAvatar').textContent = type === 'room' ? (channel ? channel.icon : '✳') : initials(name);
+    const fallback = type === 'room' ? (channel ? channel.icon : '✳') : initials(name);
+    if (type === 'person') setAvatarImage(byId('conversationAvatar'), name, fallback);
+    else {
+      byId('conversationAvatar').replaceChildren(document.createTextNode(fallback));
+      byId('conversationAvatar').classList.remove('has-photo');
+    }
     byId('conversationAvatar').classList.toggle('person', type === 'person');
     byId('conversationPresence').innerHTML = type === 'room'
       ? `<i class="live-dot"></i>${escapeHtml(channel ? channel.note : 'Canal abierto')}`
@@ -379,7 +390,11 @@
     button.setAttribute('aria-current', String(state.activeKey === item.key));
     const icon = document.createElement('span');
     icon.className = `list-avatar${item.type === 'person' ? ' person' : ''}${item.online ? ' online' : ''}`;
-    icon.textContent = item.icon;
+    const fallback = document.createElement('span');
+    fallback.className = 'avatar-fallback';
+    fallback.textContent = item.icon;
+    icon.append(fallback);
+    if (item.type === 'person') setAvatarImage(icon, item.name, item.icon, fallback);
     const copy = document.createElement('span');
     copy.className = 'conversation-item-copy';
     const name = document.createElement('strong');
@@ -447,7 +462,7 @@
     if (!message.mine) {
       const avatar = document.createElement('span');
       avatar.className = 'message-mini-avatar';
-      avatar.textContent = initials(message.author || state.activeName);
+      setAvatarImage(avatar, message.author || state.activeName, initials(message.author || state.activeName));
       row.append(avatar);
     }
     const bubble = document.createElement('div');
@@ -559,6 +574,95 @@
     return clean ? Array.from(clean)[0].toLocaleUpperCase('es') : 'E';
   }
 
+  function avatarUrl(username) {
+    const version = state.avatarVersions.get(username) || state.avatarCacheBust;
+    return `/api/avatar?id=${encodeURIComponent(state.sessionId)}&user=${encodeURIComponent(username)}&v=${version}`;
+  }
+
+  function setAvatarImage(container, username, fallbackText, fallbackNode = null, imageNode = null, ownProfile = false) {
+    const label = fallbackNode || container.querySelector('.avatar-fallback') || document.createElement('span');
+    label.classList.add('avatar-fallback');
+    label.textContent = fallbackText;
+    if (!label.parentElement) container.append(label);
+    const image = imageNode || container.querySelector('.avatar-image') || document.createElement('img');
+    image.className = 'avatar-image';
+    image.alt = '';
+    if (!image.parentElement) container.append(image);
+    container.classList.remove('has-photo');
+    if ((state.avatarMissing.get(username) || 0) > Date.now()) {
+      image.removeAttribute('src');
+      if (ownProfile) byId('removePhotoButton').classList.add('hidden');
+      return;
+    }
+    state.avatarMissing.delete(username);
+    image.onload = () => {
+      container.classList.add('has-photo');
+      if (ownProfile) byId('removePhotoButton').classList.remove('hidden');
+    };
+    image.onerror = () => {
+      container.classList.remove('has-photo');
+      state.avatarMissing.set(username, Date.now() + 60000);
+      if (ownProfile) byId('removePhotoButton').classList.add('hidden');
+    };
+    image.src = avatarUrl(username);
+  }
+
+  async function uploadProfilePhoto(file) {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      showToast('Elige una imagen PNG o JPEG.', true);
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      showToast('La foto debe pesar 4 MB o menos.', true);
+      return;
+    }
+    byId('profilePhotoButton').disabled = true;
+    byId('profilePhotoButton').classList.add('uploading');
+    try {
+      const response = await fetch(`/api/avatar?id=${encodeURIComponent(state.sessionId)}&user=${encodeURIComponent(state.username)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type },
+        body: file,
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No se pudo guardar la foto.');
+      state.avatarMissing.delete(state.username);
+      state.avatarVersions.set(state.username, Date.now());
+      byId('profilePhotoInput').value = '';
+      setAvatarImage(byId('profilePhotoButton'), state.username, initials(state.username), byId('userAvatar'), byId('userAvatarImage'), true);
+      renderDirectory();
+      if (state.activeType === 'person') setAvatarImage(byId('conversationAvatar'), state.activeName, initials(state.activeName));
+      renderMessages();
+      showToast('Foto de perfil guardada en este equipo.');
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      byId('profilePhotoButton').disabled = false;
+      byId('profilePhotoButton').classList.remove('uploading');
+    }
+  }
+
+  async function removeProfilePhoto() {
+    try {
+      const response = await fetch(`/api/avatar?id=${encodeURIComponent(state.sessionId)}&user=${encodeURIComponent(state.username)}`, {
+        method: 'DELETE', cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No se pudo quitar la foto.');
+      state.avatarMissing.set(state.username, Date.now() + 60000);
+      state.avatarVersions.set(state.username, Date.now());
+      setAvatarImage(byId('profilePhotoButton'), state.username, initials(state.username), byId('userAvatar'), byId('userAvatarImage'), true);
+      renderDirectory();
+      if (state.activeType === 'person') setAvatarImage(byId('conversationAvatar'), state.activeName, initials(state.activeName));
+      renderMessages();
+      showToast('Foto de perfil quitada.');
+    } catch (error) {
+      showToast(error.message, true);
+    }
+  }
+
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, character => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -630,6 +734,25 @@
     });
     byId('backToList').addEventListener('click', () => chatApp.classList.remove('mobile-chat-open'));
     byId('logoutButton').addEventListener('click', logout);
+    byId('profilePhotoButton').addEventListener('click', () => byId('profilePhotoInput').click());
+    byId('profilePhotoInput').addEventListener('change', event => void uploadProfilePhoto(event.target.files[0]));
+    byId('removePhotoButton').addEventListener('click', event => {
+      event.stopPropagation();
+      void removeProfilePhoto();
+    });
+    const photoTarget = byId('profilePhotoButton');
+    photoTarget.addEventListener('dragover', event => {
+      event.preventDefault();
+      photoTarget.classList.add('drag-over');
+    });
+    photoTarget.addEventListener('dragleave', event => {
+      if (!photoTarget.contains(event.relatedTarget)) photoTarget.classList.remove('drag-over');
+    });
+    photoTarget.addEventListener('drop', event => {
+      event.preventDefault();
+      photoTarget.classList.remove('drag-over');
+      void uploadProfilePhoto(event.dataTransfer.files[0]);
+    });
     byId('composerForm').addEventListener('submit', submitMessage);
     byId('messageInput').addEventListener('input', () => {
       resizeComposer();

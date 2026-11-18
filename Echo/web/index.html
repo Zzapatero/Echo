@@ -77,7 +77,17 @@
         <a class="brand" href="#chats" aria-label="Echo"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M7 20h4l3.2-8 6.1 16 4.1-11 3.1 7H33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 37c9.4 0 17-7.6 17-17S29.4 3 20 3 3 10.6 3 20c0 3.3.9 6.3 2.5 8.9L4 36l7.2-1.4A16.8 16.8 0 0 0 20 37Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>echo<span class="brand-period">.</span></span></a>
         <div class="header-actions"><button id="newChatButton" class="icon-button" type="button" title="Buscar personas" aria-label="Buscar personas"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7"/><path d="m13 13 4 4"/></svg></button><button id="logoutButton" class="icon-button" type="button" title="Cerrar sesión" aria-label="Cerrar sesión"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17H8m4-3 4-4-4-4m4 4H7"/></svg></button></div>
       </header>
-      <div class="welcome-strip"><div class="avatar avatar-self" id="userAvatar">E</div><div><strong id="userName">Echo</strong><span><i class="live-dot"></i> Disponible</span></div><button class="more-button" type="button" aria-label="Opciones">···</button></div>
+      <div class="welcome-strip">
+        <div class="profile-photo-control">
+          <button id="profilePhotoButton" class="avatar avatar-self profile-photo-button" type="button" title="Cambiar foto de perfil" aria-label="Cambiar foto de perfil o soltar una imagen aquí">
+            <span id="userAvatar">E</span><img id="userAvatarImage" class="avatar-image" alt="">
+            <span class="photo-edit-indicator"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.2-2h5.6l1.2 2h3v9H3v-9Z"/><circle cx="10" cy="11" r="2.8"/></svg></span>
+          </button>
+          <input id="profilePhotoInput" class="sr-only" type="file" accept="image/png,image/jpeg" aria-label="Elegir foto de perfil">
+          <button id="removePhotoButton" class="photo-remove hidden" type="button" aria-label="Quitar foto de perfil" title="Quitar foto"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10m-8 0 .5 9h5L11 4m-4 0V2.5h2V4"/></svg></button>
+        </div>
+        <div><strong id="userName">Echo</strong><span><i class="live-dot"></i> Disponible</span><small class="profile-hint">Toca el avatar para cambiar la foto</small></div>
+      </div>
       <label class="search-box" for="directorySearch"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7"/><path d="m13 13 4 4"/></svg><input id="directorySearch" type="search" placeholder="Buscar una conversación" autocomplete="off"><kbd>⌘ K</kbd></label>
       <div class="list-heading"><span>CONVERSACIONES</span><button id="refreshDirectory" class="icon-button small-icon" type="button" title="Actualizar personas" aria-label="Actualizar personas"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8a6 6 0 0 0-10.2-3L4 7m0-4v4h4m-4 5a6 6 0 0 0 10.2 3L16 13m0 4v-4h-4"/></svg></button></div>
       <nav class="conversation-list" id="conversationList" aria-label="Canales y personas"></nav>
