@@ -115,6 +115,3 @@ try {
 - La persistencia se basa en archivos CSV locales, no en una base de datos multiusuario.
 - Los canales y la presencia se mantienen en memoria y se reinician al apagar el servidor.
 
-## Licencia
-
-Este repositorio no especifica todavía una licencia. Añade un archivo `LICENSE` si quieres definir los permisos de uso, modificación y distribución.
