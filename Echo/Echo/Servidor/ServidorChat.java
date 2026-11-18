@@ -13,8 +13,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.awt.GraphicsEnvironment;
-import javax.swing.SwingUtilities;
 
 /**
  * Servidor principal del chat que gestiona el ciclo de vida de las conexiones,
@@ -161,13 +159,12 @@ public class ServidorChat {
 }
 
     /**
-     * Arranca el bucle principal del servidor, abre el panel de administración
-     * y acepta conexiones entrantes de sockets asociándoles un hilo dedicado.
+     * Arranca la web local y acepta conexiones TCP en loopback.
      */
     public void iniciar() {
-        iniciarPanelAdministracion();
         try (ServerSocket serverSocket = new ServerSocket(PUERTO, 50,
                 java.net.InetAddress.getByName("127.0.0.1"))) {
+            new EchoWebServer().iniciar();
             System.out.println("Servidor Echo operativo en 127.0.0.1:" + PUERTO);
             GestorLogs.registrar("servidor.log", "SERVIDOR ECHO INICIADO EN 127.0.0.1:" + PUERTO);
             while (true) {
@@ -186,14 +183,6 @@ public class ServidorChat {
         } catch (IOException e) {
             System.out.println("Error en servidor: " + e.getMessage());
         }
-    }
-
-    private static void iniciarPanelAdministracion() {
-        if (GraphicsEnvironment.isHeadless()) {
-            System.out.println("Entorno sin interfaz gráfica; el servidor continuará sin panel de administración.");
-            return;
-        }
-        SwingUtilities.invokeLater(() -> new VentanaAdministracion().setVisible(true));
     }
 
     public static void main(String[] args) {

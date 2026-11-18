@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101918">
+  <meta name="description" content="Echo: conversaciones en tiempo real, canales y mensajes privados sobre TCP.">
+  <title>Echo · Mensajería</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <main id="authScreen" class="auth-layout">
+    <section class="auth-story" aria-label="Echo, mensajería para estar cerca">
+      <a class="brand brand-large" href="#inicio" aria-label="Echo inicio">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none"><path d="M7 20h4l3.2-8 6.1 16 4.1-11 3.1 7H33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 37c9.4 0 17-7.6 17-17S29.4 3 20 3 3 10.6 3 20c0 3.3.9 6.3 2.5 8.9L4 36l7.2-1.4A16.8 16.8 0 0 0 20 37Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </span>
+        <span>echo<span class="brand-period">.</span></span>
+      </a>
+      <div class="story-copy">
+        <span class="eyebrow"><span class="live-dot"></span> CONVERSACIONES EN TIEMPO REAL</span>
+        <h1>Las buenas<br>conversaciones<br><em>hacen eco.</em></h1>
+        <p>Un espacio tranquilo para hablar, compartir ideas y seguir cerca.</p>
+      </div>
+      <div class="story-card" aria-hidden="true">
+        <div class="story-avatar">M</div>
+        <div class="story-bubble"><span>¿Te unes al canal de tecnología?</span><small>ahora · General</small></div>
+        <div class="story-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <span class="story-caption">Mensajería sencilla. Conexiones que permanecen.</span>
+    </section>
+
+    <section class="auth-card" aria-labelledby="authTitle">
+      <div class="auth-card-top">
+        <span class="mobile-brand brand"><span class="brand-mark" aria-hidden="true">e</span><span>echo<span class="brand-period">.</span></span></span>
+        <span class="secure-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 7V5a4 4 0 0 1 8 0v2m-9 0h10v7H3V7Z"/></svg> Conexión local segura</span>
+      </div>
+      <div class="auth-heading">
+        <span class="eyebrow">TU ESPACIO TE ESPERA</span>
+        <h2 id="authTitle">Qué bueno verte.</h2>
+        <p id="authSubtitle">Entra y retoma la conversación donde la dejaste.</p>
+      </div>
+      <div id="authTabs" class="auth-tabs" role="tablist" aria-label="Acceso a Echo">
+        <button class="auth-tab active" id="loginTab" type="button" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button class="auth-tab" id="registerTab" type="button" role="tab" aria-selected="false">Crear cuenta</button>
+      </div>
+      <form id="authForm" class="auth-form">
+        <label for="username">Nombre de usuario</label>
+        <div class="input-wrap"><span class="input-icon" aria-hidden="true">@</span><input id="username" name="username" autocomplete="username" maxlength="40" placeholder="Tu nombre" required></div>
+        <label for="password">Contraseña</label>
+        <div class="input-wrap"><svg class="input-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="8" width="13" height="9" rx="2"/><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2"/></svg><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Tu contraseña" required><button type="button" class="reveal-password" id="togglePassword" aria-label="Mostrar contraseña"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s2.9-5 8-5 8 5 8 5-2.9 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg></button></div>
+        <p id="passwordHelp" class="field-hint">Tus conversaciones están a un clic.</p>
+        <button class="primary-button auth-submit" id="authSubmit" type="submit"><span>Entrar a Echo</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></button>
+      </form>
+      <div id="authNotice" class="notice" role="status" aria-live="polite"></div>
+      <p id="authFootnote" class="auth-footnote">Al continuar, te conectas a una instancia de Echo en este equipo.</p>
+
+      <form id="resetForm" class="reset-form hidden">
+        <div class="reset-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.8 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.7 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h2>Actualiza tu contraseña</h2>
+        <p>Por seguridad, elige una nueva contraseña para continuar.</p>
+        <label for="newPassword">Nueva contraseña</label>
+        <div class="input-wrap"><input id="newPassword" type="password" minlength="12" autocomplete="new-password" placeholder="Mínimo 12 caracteres" required></div>
+        <button class="primary-button auth-submit" type="submit"><span>Guardar contraseña</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></button>
+        <div id="resetNotice" class="notice" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+  </main>
+
+  <main id="chatApp" class="chat-app hidden">
+    <aside id="sidebar" class="sidebar">
+      <header class="sidebar-header">
+        <a class="brand" href="#chats" aria-label="Echo"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M7 20h4l3.2-8 6.1 16 4.1-11 3.1 7H33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 37c9.4 0 17-7.6 17-17S29.4 3 20 3 3 10.6 3 20c0 3.3.9 6.3 2.5 8.9L4 36l7.2-1.4A16.8 16.8 0 0 0 20 37Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>echo<span class="brand-period">.</span></span></a>
+        <div class="header-actions"><button id="newChatButton" class="icon-button" type="button" title="Buscar personas" aria-label="Buscar personas"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7"/><path d="m13 13 4 4"/></svg></button><button id="logoutButton" class="icon-button" type="button" title="Cerrar sesión" aria-label="Cerrar sesión"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17H8m4-3 4-4-4-4m4 4H7"/></svg></button></div>
+      </header>
+      <div class="welcome-strip"><div class="avatar avatar-self" id="userAvatar">E</div><div><strong id="userName">Echo</strong><span><i class="live-dot"></i> Disponible</span></div><button class="more-button" type="button" aria-label="Opciones">···</button></div>
+      <label class="search-box" for="directorySearch"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7"/><path d="m13 13 4 4"/></svg><input id="directorySearch" type="search" placeholder="Buscar una conversación" autocomplete="off"><kbd>⌘ K</kbd></label>
+      <div class="list-heading"><span>CONVERSACIONES</span><button id="refreshDirectory" class="icon-button small-icon" type="button" title="Actualizar personas" aria-label="Actualizar personas"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8a6 6 0 0 0-10.2-3L4 7m0-4v4h4m-4 5a6 6 0 0 0 10.2 3L16 13m0 4v-4h-4"/></svg></button></div>
+      <nav class="conversation-list" id="conversationList" aria-label="Canales y personas"></nav>
+      <footer class="sidebar-footer"><span class="footer-lock"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 7V5a4 4 0 0 1 8 0v2m-9 0h10v7H3V7Z"/></svg></span><span>Conectado localmente por TCP</span><span class="footer-status"></span></footer>
+    </aside>
+
+    <section class="conversation-view" id="conversationView" aria-label="Conversación">
+      <div id="emptyState" class="empty-state">
+        <div class="empty-art"><div class="empty-ring ring-one"></div><div class="empty-ring ring-two"></div><div class="empty-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 23.5h5l4-10 8 21 5-14 4 8h8"/><path d="M24 44c11 0 20-9 20-20S35 4 24 4 4 13 4 24c0 4 1.2 7.7 3.3 10.8L5.5 44l9-1.8A19.8 19.8 0 0 0 24 44Z"/></svg></div></div>
+        <p class="eyebrow">TU RED, A TU RITMO</p><h1>Una conversación<br>puede empezar aquí.</h1><p>Elige un canal o encuentra a alguien<br>para empezar a hablar.</p>
+        <button id="findPeopleButton" class="secondary-button" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7"/><path d="m13 13 4 4"/></svg> Encontrar personas</button>
+      </div>
+
+      <div id="activeConversation" class="active-conversation hidden">
+        <header class="conversation-header">
+          <button id="backToList" class="icon-button mobile-back" type="button" aria-label="Volver a conversaciones"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6"/></svg></button>
+          <div id="conversationAvatar" class="avatar conversation-avatar">G</div>
+          <div class="conversation-title"><h2 id="conversationName">General</h2><p id="conversationPresence"><i class="live-dot"></i> Canal abierto · Conversaciones de todos</p></div>
+        <div class="conversation-tools"><button id="conversationSearchButton" class="icon-button" type="button" title="Buscar personas y canales" aria-label="Buscar personas y canales"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7"/><path d="m13 13 4 4"/></svg></button></div>
+        </header>
+        <div id="messageList" class="message-list" aria-live="polite" aria-label="Mensajes"></div>
+        <form id="composerForm" class="composer">
+          <button id="emojiButton" class="icon-button composer-tool" type="button" aria-label="Añadir emoji" title="Añadir emoji"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M7 11.5s1.1 1.8 3 1.8 3-1.8 3-1.8M7.5 7.5h.1m4.8 0h.1"/></svg></button>
+          <label class="composer-input" for="messageInput"><span class="sr-only">Escribe un mensaje</span><textarea id="messageInput" rows="1" maxlength="4000" placeholder="Escribe un mensaje" autocomplete="off"></textarea></label>
+          <span id="characterCount" class="character-count"></span>
+          <button id="sendButton" class="send-button" type="submit" aria-label="Enviar mensaje"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.4 18-3.5-7.1L3 10.4 21 3Z"/><path d="M10.1 13.9 15 9"/></svg></button>
+        </form>
+        <div class="conversation-footnote">Pulsa <kbd>Enter</kbd> para enviar <span>·</span> Los mensajes se envían en una línea</div>
+      </div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+</body>
+</html>

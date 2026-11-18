@@ -1,6 +1,6 @@
 # Echo
 
-Echo es una aplicación de mensajería en tiempo real construida en Java. Mantiene sockets TCP para el transporte y ofrece una interfaz de escritorio Swing con tema oscuro, canales, directorio de usuarios y conversaciones privadas.
+Echo es una aplicación de mensajería en tiempo real construida en Java. Mantiene sockets TCP para el transporte y ofrece una interfaz web adaptable, hecha con HTML, CSS y JavaScript, con canales, directorio de usuarios y conversaciones privadas.
 
 ## Funciones
 
@@ -10,45 +10,43 @@ Echo es una aplicación de mensajería en tiempo real construida en Java. Mantie
 - Búsqueda de personas registradas con indicador de conexión.
 - Mensajes privados a personas conectadas o desconectadas. Los pendientes se guardan y se confirman al recibirlos.
 - Historial de canales guardado en CSV.
-- Panel local para pausar conexiones, activar mantenimiento y consultar métricas.
+- Interfaz web adaptable con buscador de personas, presencia y canales.
+- Actualización periódica de eventos a través de sesiones TCP persistentes.
 
 ## Arquitectura
 
-El servidor TCP escucha en el puerto `5000` y atiende cada conexión en su propio hilo. Los comandos de protocolo se traducen a acciones de usuarios, canales y mensajes. Los usuarios y los mensajes de canal usan CSV; los mensajes privados pendientes se guardan en `mensajes_privados.csv`.
+El servidor TCP escucha en `127.0.0.1:5000` y atiende cada conexión en su propio hilo. El servidor HTTP local sirve la interfaz en `127.0.0.1:8080`; cada navegador conserva una sesión TCP y la web consulta los eventos periódicamente. Los comandos de protocolo se traducen a acciones de usuarios, canales y mensajes. Los CSV locales almacenan las cuentas y el historial; los mensajes privados pendientes se guardan hasta confirmar su entrega.
 
-La interfaz cliente es Swing y se conecta por TCP a `127.0.0.1:5000`. El servidor escucha solo en loopback: esta configuración es para uso local en el mismo equipo; no expone credenciales en una red local. Para acceso remoto haría falta añadir TLS. No requiere frameworks ni dependencias externas para la aplicación. El JAR incluido en `lib/` se usa únicamente para las pruebas existentes.
+La web y el servidor solo escuchan en loopback, por lo que Echo está pensado para usarse en el mismo equipo. Para acceso remoto haría falta añadir TLS. La aplicación no requiere frameworks, dependencias externas ni recursos de CDN. El JAR incluido en `lib/` se usa únicamente para las pruebas existentes.
 
 ## Requisitos
 
 - JDK 8 o posterior.
-- Windows, macOS o Linux con entorno gráfico para usar las interfaces Swing.
+- Windows, macOS o Linux con un navegador moderno.
 
 ## Compilar y ejecutar en Windows PowerShell
 
-Abre una terminal en la carpeta `Echo` de este proyecto. Mantén esa carpeta como directorio de trabajo: los CSV de cuentas y mensajes se crearán localmente al usar la aplicación y están excluidos del repositorio.
+Abre una terminal en la carpeta `Echo` de este proyecto, junto a la carpeta `web`. Mantén esa carpeta como directorio de trabajo para que los archivos CSV locales se creen allí; están excluidos del repositorio.
 
 Compila las clases de producción en una carpeta temporal:
 
 ```powershell
 $clases = Join-Path $env:TEMP 'echo-classes'
+New-Item -ItemType Directory -Force $clases | Out-Null
 $fuentes = Get-ChildItem .\Echo -Recurse -Filter *.java |
     Where-Object { $_.FullName -notmatch '[\\/]Pruebas[\\/]' }
 javac -encoding UTF-8 -d $clases $fuentes.FullName
 ```
 
-En una primera terminal, inicia el servidor y su panel de administración:
+Inicia el servidor TCP y el puente web:
 
 ```powershell
 java -cp $clases Servidor.ServidorChat
 ```
 
-En otra terminal, situada también en esta carpeta, abre el cliente:
+Abre `http://127.0.0.1:8080` en tu navegador, crea una cuenta y empieza a conversar. El servidor debe permanecer abierto mientras uses Echo. Para detenerlo, pulsa `Ctrl+C` en la terminal.
 
-```powershell
-java -cp $clases Cliente.VentanaChat
-```
-
-Las cuentas que ya existían conservan su clave temporal para el primer acceso; después, Echo obliga a reemplazarla por una de al menos 12 caracteres. Las cuentas nuevas eligen su propia clave al registrarse.
+Las cuentas nuevas eligen su clave al registrarse. Si tienes una cuenta local migrada de la versión anterior, Echo te pedirá cambiarla en el primer acceso.
 
 ## Pruebas existentes
 
