@@ -3,6 +3,7 @@ package Servidor;
 import Cliente.ManejadorClientes;
 import ServidorInterfaces.IClienteConectado;
 import ServidorInterfaces.IServicioMensajes;
+import ServidorInterfaces.IServicioMensajesPrivados;
 import ServidorInterfaces.IServicioSalones;
 import ServidorInterfaces.IServicioUsuarios;
 import java.io.IOException;
@@ -12,6 +13,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.awt.GraphicsEnvironment;
+import javax.swing.SwingUtilities;
 
 /**
  * Servidor principal del chat que gestiona el ciclo de vida de las conexiones,
@@ -21,12 +24,14 @@ public class ServidorChat {
     private static final int PUERTO = 5000;
     public static final List<IClienteConectado> clientesConectados = Collections.synchronizedList(new ArrayList<>());
     private static final IServicioMensajes gestorMensajes = new GestorMensajesCSV();
+    private static final IServicioMensajesPrivados gestorMensajesPrivados = new GestorMensajesPrivadosCSV();
     
     /**
      * Devuelve el servicio encargado de la persistencia e historial de mensajes.
      * @return Instancia del gestor de mensajes en formato CSV.
      */
     public static IServicioMensajes obtenerGestorMensajes() { return gestorMensajes; }
+    public static IServicioMensajesPrivados obtenerGestorMensajesPrivados() { return gestorMensajesPrivados; }
     
     public static volatile boolean aceptarConexiones = true;
     public static volatile boolean mantenimiento = false;
@@ -82,11 +87,11 @@ public class ServidorChat {
      * @param msg Contenido textual del mensaje privado.
      * @return true si el usuario destino está conectado y autenticado, false en caso contrario.
      */
-    public static boolean enviarPrivadoDirecto(String remitente, String destino, String msg) {
+    public static boolean enviarPrivadoDirecto(MensajePrivadoPendiente mensaje) {
         synchronized (clientesConectados) {
             for (IClienteConectado c : clientesConectados) {
-                if (c.isAutenticado() && c.getNombreUsuario().equals(destino)) {
-                    c.enviarMensaje("RECV_PRIV|" + remitente + "|" + msg);
+                if (c.isAutenticado() && c.getNombreUsuario().equals(mensaje.getDestinatario())) {
+                    c.enviarMensaje(tramaPrivada(mensaje));
                     return true;
                 }
             }
@@ -94,39 +99,18 @@ public class ServidorChat {
         return false;
     }
 
-  private static void iniciarConsolaAdmin() {
-        new Thread(() -> {
-            java.util.Scanner scanner = new java.util.Scanner(System.in);
-            System.out.println("\n=== CONSOLA DE ADMINISTRACIÓN ACTIVA ===");
-            System.out.println("Escribe 'maintenance on' para expulsar a todos.");
-            
-            while (true) {
-                String comando = scanner.nextLine().trim().toLowerCase(); 
-                
-                if (comando.equals("1")) {
-                    aceptarConexiones = false;
-                    System.out.println(" Accesos cerrados.");
-                } else if (comando.equals("2")) {
-                    aceptarConexiones = true;
-                    System.out.println(" Accesos abiertos.");
-                } else if (comando.equals("stats") || comando.equals("3")) {
-                    imprimirMetricas();
-                } else if (comando.equals("maintenance on")) {
-                    mantenimiento = true;
-                    System.out.println(" Mantenimiento activado. Expulsando clientes...");
-                    GestorLogs.registrar("servidor.log", "¡ALERTA! El administrador ha ACTIVADO el modo mantenimiento.");
-                    difundirATodos("MAINTENANCE|ON");
-                    
-                } else if (comando.equals("maintenance off")) {
-                    mantenimiento = false;
-                    System.out.println(" Mantenimiento desactivado.");
-                
-                    difundirATodos("MAINTENANCE|OFF");
-                } else {
-                    System.out.println("Comando desconocido.");
-                }
-            }
-        }).start();
+    public static String tramaPrivada(MensajePrivadoPendiente mensaje) {
+        String contenidoCodificado = java.util.Base64.getEncoder().encodeToString(
+                mensaje.getContenido().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return "RECV_PRIV|" + mensaje.getId() + "|" + mensaje.getRemitente() + "|"
+                + mensaje.getFechaHora() + "|" + contenidoCodificado;
+    }
+
+    public static void finalizarInicioSesion(IClienteConectado cliente) {
+        for (MensajePrivadoPendiente mensaje : gestorMensajesPrivados.obtenerPendientes(cliente.getNombreUsuario())) {
+            cliente.enviarMensaje(tramaPrivada(mensaje));
+        }
+        difundirNotificacion("NOTIFY_JOIN|" + cliente.getNombreUsuario(), cliente);
     }
 
     /**
@@ -134,7 +118,11 @@ public class ServidorChat {
      * usuarios online totales, usuarios activos por sala y mensajes acumulados por salón.
      */
     public static synchronized void imprimirMetricas() {
-        System.out.println("--- ESTADÍSTICAS EN TIEMPO REAL ---");
+        System.out.println(obtenerResumenMetricas());
+    }
+
+    public static synchronized String obtenerResumenMetricas() {
+        StringBuilder resumen = new StringBuilder("=== ECHO · ESTADÍSTICAS ===\n");
         int activos = 0;
         java.util.Map<String, Integer> salasActivas = new java.util.HashMap<>();
         
@@ -146,18 +134,19 @@ public class ServidorChat {
                 }
             }
         }
-        System.out.println("Usuarios conectados al instante: " + activos);
-        System.out.println("Usuarios activos por salón:");
-        String[] salonesSoportados = {"IA", "Deportes", "Manga", "Therian", "UEMC"};
+        resumen.append("Usuarios conectados: ").append(activos).append('\n');
+        resumen.append("Personas por canal:\n");
+        String[] salonesSoportados = {"General", "Fútbol", "Inteligencia Artificial", "Noticias", "Actualidad", "Tecnología"};
         for (String s : salonesSoportados) {
             int cant = salasActivas.getOrDefault(s, 0);
-            System.out.println(" - " + s + ": " + cant + " activo(s)");
+            resumen.append(" · ").append(s).append(": ").append(cant).append(" en línea\n");
         }
-        System.out.println("Mensajes totales enviados por salón:");
+        resumen.append("Mensajes por canal:\n");
         for (String s : salonesSoportados) {
             int cant = gestorSalones.obtenerMetricas().getOrDefault(s, 0);
-            System.out.println(" - " + s + ": " + cant + " mensaje(s)");
+            resumen.append(" · ").append(s).append(": ").append(cant).append('\n');
         }
+        return resumen.toString();
     }
     /**
      * Difunde una trama de control o texto a absolutamente todos los clientes conectados en el socket.
@@ -172,14 +161,15 @@ public class ServidorChat {
 }
 
     /**
-     * Arranca el bucle principal del servidor, inicializa la consola de administración
+     * Arranca el bucle principal del servidor, abre el panel de administración
      * y acepta conexiones entrantes de sockets asociándoles un hilo dedicado.
      */
     public void iniciar() {
-        iniciarConsolaAdmin();
-        try (ServerSocket serverSocket = new ServerSocket(PUERTO)) {
-            System.out.println("Servidor operativo en puerto " + PUERTO);
-            GestorLogs.registrar("servidor.log", "SERVIDOR INICIADO EN PUERTO " + PUERTO);
+        iniciarPanelAdministracion();
+        try (ServerSocket serverSocket = new ServerSocket(PUERTO, 50,
+                java.net.InetAddress.getByName("127.0.0.1"))) {
+            System.out.println("Servidor Echo operativo en 127.0.0.1:" + PUERTO);
+            GestorLogs.registrar("servidor.log", "SERVIDOR ECHO INICIADO EN 127.0.0.1:" + PUERTO);
             while (true) {
                 Socket socketCliente = serverSocket.accept();
                 if (!aceptarConexiones) {
@@ -196,6 +186,14 @@ public class ServidorChat {
         } catch (IOException e) {
             System.out.println("Error en servidor: " + e.getMessage());
         }
+    }
+
+    private static void iniciarPanelAdministracion() {
+        if (GraphicsEnvironment.isHeadless()) {
+            System.out.println("Entorno sin interfaz gráfica; el servidor continuará sin panel de administración.");
+            return;
+        }
+        SwingUtilities.invokeLater(() -> new VentanaAdministracion().setVisible(true));
     }
 
     public static void main(String[] args) {

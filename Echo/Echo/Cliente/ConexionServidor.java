@@ -4,7 +4,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Abstracción de red del lado del cliente encargada de la comunicación por sockets,
@@ -12,7 +14,7 @@ import java.net.Socket;
  */
 public class ConexionServidor {
     private Socket socket;
-    private PrintWriter salida
+    private PrintWriter salida;
     private BufferedReader entrada;
 
     /**
@@ -23,17 +25,21 @@ public class ConexionServidor {
      */
     public void conectar(String ip, int puerto) throws IOException {
         this.socket = new Socket(ip, puerto);
-        this.salida = new PrintWriter(socket.getOutputStream(), true);
-        this.entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.salida = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+        this.entrada = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
     }
 
     /**
      * Escribe de forma inmediata un comando o protocolo de texto hacia el flujo de salida de red.
      * @param comando Trama de texto plano para enviar al servidor.
      */
-    public void enviarComando(String comando) {
-        if (salida != null) {
+    public synchronized void enviarComando(String comando) {
+        if (salida != null && socket != null && !socket.isClosed()) {
             salida.println(comando);
+            if (salida.checkError()) {
+                System.out.println("No se pudo enviar el comando al servidor.");
+                detenerSistemaHeartbeat();
+            }
         }
     }
 
@@ -43,16 +49,32 @@ public class ConexionServidor {
      * @param alRecibirMensaje Consumidor funcional encargado de procesar la trama recibida en la GUI.
      */
     public void escucharServidor(java.util.function.Consumer<String> alRecibirMensaje) {
-        new Thread(() -> {
+        Thread hiloEscucha = new Thread(() -> {
             try {
                 String linea;
                 while ((linea = entrada.readLine()) != null) {
                     alRecibirMensaje.accept(linea);
                 }
             } catch (IOException e) {
-                System.out.println("Conexión perdida con el servidor.");
+                if (socket != null && !socket.isClosed()) {
+                    System.out.println("Conexión perdida con el servidor: " + e.getMessage());
+                }
+            } finally {
+                detenerSistemaHeartbeat();
+                alRecibirMensaje.accept("CONNECTION_CLOSED|");
             }
-        }).start();
+        }, "Echo-TCP-Listener");
+        hiloEscucha.setDaemon(true);
+        hiloEscucha.start();
+    }
+
+    public void cerrar() {
+        detenerSistemaHeartbeat();
+        try {
+            if (socket != null && !socket.isClosed()) socket.close();
+        } catch (IOException e) {
+            System.out.println("No se pudo cerrar la conexión: " + e.getMessage());
+        }
     }
 
     private Thread hiloHeartbeat;

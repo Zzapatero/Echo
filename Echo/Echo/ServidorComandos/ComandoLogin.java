@@ -24,8 +24,12 @@ public class ComandoLogin implements Comando {
             cliente.setNombreUsuario(usuario);
             cliente.setAutenticado(true);
             Servidor.GestorLogs.registrar("servidor.log", "Login correcto de usuario: " + usuario);
-            cliente.enviarMensaje("LOGIN_OK|IA,Deportes,Therian,Manga,UEMC");
-            ServidorChat.difundirNotificacion("NOTIFY_JOIN|" + usuario, cliente);
+            if (servicioUsuarios.requiereCambioClave(usuario)) {
+                cliente.enviarMensaje("LOGIN_OK|RESET_REQUIRED");
+            } else {
+                cliente.enviarMensaje("LOGIN_OK|General,Fútbol,Inteligencia Artificial,Noticias,Actualidad,Tecnología");
+                ServidorChat.finalizarInicioSesion(cliente);
+            }
         } else {
             cliente.enviarMensaje("LOGIN_ERR|Credenciales_invalidas");
         }

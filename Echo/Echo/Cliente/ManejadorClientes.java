@@ -5,11 +5,14 @@ import ServidorInterfaces.IClienteConectado;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Componente del lado del servidor que encapsula el estado físico y lógico de una sesión activa,
@@ -20,9 +23,9 @@ public class ManejadorClientes implements Runnable, IClienteConectado {
     private BufferedReader entrada;
     private PrintWriter salida;
 
-    public String nombreUsuario = "Anonimo";
-    public boolean autenticado = false;
-    private boolean yaDesconectado = false;
+    public volatile String nombreUsuario = "Anonimo";
+    public volatile boolean autenticado = false;
+    private final AtomicBoolean yaDesconectado = new AtomicBoolean(false);
     public Set<String> salonesActivos = Collections.synchronizedSet(new HashSet<>());
 
     public ManejadorClientes(Socket socket) {
@@ -81,8 +84,8 @@ public class ManejadorClientes implements Runnable, IClienteConectado {
             Servidor.ServidorChat.obtenerGestorSalones(),
             Servidor.ServidorChat.obtenerGestorMensajes()
             );
-            entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            salida = new PrintWriter(socket.getOutputStream(), true);
+            entrada = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            salida = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
             
         
             String mensajeCrudo;
@@ -94,7 +97,9 @@ public class ManejadorClientes implements Runnable, IClienteConectado {
                 enrutador.procesar(mensajeCrudo, this);
             }
         } catch (IOException e) {
-            System.out.println("Pérdida de socket con el cliente.");
+            if (!yaDesconectado.get()) {
+                System.out.println("Conexión cerrada con " + nombreUsuario + ": " + e.getMessage());
+            }
         } finally {
             cerrarConexion();
         }
@@ -102,16 +107,21 @@ public class ManejadorClientes implements Runnable, IClienteConectado {
 
     @Override
     public void cerrarConexion() {
+        if (!yaDesconectado.compareAndSet(false, true)) return;
+
+        boolean estabaAutenticado = autenticado;
+        autenticado = false;
+        Servidor.GestorLogs.registrar("servidor.log", "Cliente desconectado: " + this.nombreUsuario);
+        Servidor.ServidorChat.clientesConectados.remove(this);
+        if (estabaAutenticado) {
+            Servidor.ServidorChat.difundirNotificacion("NOTIFY_LEAVE|" + this.nombreUsuario, this);
+        }
         try {
-            if (yaDesconectado) return;
-            yaDesconectado = true;
-            Servidor.GestorLogs.registrar("servidor.log", "Cliente desconectado: " + this.nombreUsuario);
-            Servidor.ServidorChat.clientesConectados.remove(this);
-            if (autenticado) {
-                Servidor.ServidorChat.difundirNotificacion("NOTIFY_LEAVE|" + this.nombreUsuario, this);
-            }
             if (socket != null && !socket.isClosed()) socket.close();
+        } catch (IOException e) {
+            System.out.println("No se pudo cerrar el socket de " + nombreUsuario + ": " + e.getMessage());
+        } finally {
             Servidor.ServidorChat.imprimirMetricas();
-        } catch (IOException e) {}
+        }
     }
 }

@@ -9,12 +9,12 @@ public class GestorSalonesMemoriaTest {
     @Test
     public void testRegistrarYObtenerMetricas() {
         GestorSalonesMemoria gestor = new GestorSalonesMemoria();
-        gestor.registrarMensaje("IA");
-        gestor.registrarMensaje("IA");
-        gestor.registrarMensaje("Deportes");
+        gestor.registrarMensaje("Inteligencia Artificial");
+        gestor.registrarMensaje("Inteligencia Artificial");
+        gestor.registrarMensaje("Fútbol");
 
-        assertEquals("El salón IA debería tener 2 mensajes", Integer.valueOf(2), gestor.obtenerMetricas().get("IA"));
-        assertEquals("El salón Deportes debería tener 1 mensaje", Integer.valueOf(1), gestor.obtenerMetricas().get("Deportes"));
-        assertNull("El salón Manga no debería tener mensajes", gestor.obtenerMetricas().get("Manga"));
+        assertEquals("El canal Inteligencia Artificial debería tener 2 mensajes", Integer.valueOf(2), gestor.obtenerMetricas().get("Inteligencia Artificial"));
+        assertEquals("El canal Fútbol debería tener 1 mensaje", Integer.valueOf(1), gestor.obtenerMetricas().get("Fútbol"));
+        assertNull("El canal General no debería tener mensajes", gestor.obtenerMetricas().get("General"));
     }
 }

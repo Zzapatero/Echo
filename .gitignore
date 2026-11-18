@@ -1,0 +1,6 @@
+# Datos locales de Echo
+/Echo/usuarios.csv
+/Echo/mensajes.csv
+/Echo/mensajes_privados.csv
+/Echo/servidor.log
+/Echo/*.tmp

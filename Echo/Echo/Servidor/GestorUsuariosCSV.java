@@ -1,15 +1,23 @@
 package Servidor;
 
 import ServidorInterfaces.IServicioUsuarios;
-import java.io.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Implementación del servicio de usuarios que utiliza un mapa concurrente en memoria
- * sincronizado con un archivo plano CSV para el almacenamiento permanente de credenciales.
- */
+/** Usuarios persistidos en CSV con migración de claves heredadas a PBKDF2. */
 public class GestorUsuariosCSV implements IServicioUsuarios {
-    private static final String ARCHIVO_USUARIOS = "usuarios.csv";
+    private static final Path ARCHIVO_USUARIOS = Paths.get("usuarios.csv");
     private final ConcurrentHashMap<String, String> usuariosRegistrados = new ConcurrentHashMap<>();
 
     public GestorUsuariosCSV() {
@@ -17,65 +25,106 @@ public class GestorUsuariosCSV implements IServicioUsuarios {
     }
 
     private void cargarDesdeCSV() {
-        File archivo = new File(ARCHIVO_USUARIOS);
-        if (!archivo.exists()) return;
-        try (BufferedReader br = new BufferedReader(new FileReader(archivo))) {
-            String linea;
-            while ((linea = br.readLine()) != null) {
-                String[] partes = linea.split(",");
-                if (partes.length == 2) {
-                    usuariosRegistrados.put(partes[0], partes[1]);
+        if (!Files.exists(ARCHIVO_USUARIOS)) return;
+        boolean migrado = false;
+        try {
+            for (String linea : Files.readAllLines(ARCHIVO_USUARIOS, StandardCharsets.UTF_8)) {
+                String[] partes = linea.split(",", 2);
+                if (partes.length != 2 || partes[0].trim().isEmpty()) continue;
+                String almacenada = partes[1];
+                if (!SeguridadCredenciales.esHash(almacenada)) {
+                    almacenada = SeguridadCredenciales.hash(almacenada, true);
+                    migrado = true;
                 }
+                usuariosRegistrados.put(partes[0], almacenada);
             }
-            System.out.println("[Usuarios] Base de datos CSV sincronizada.");
+            if (migrado) persistir();
+            System.out.println("[Usuarios] Cuentas cargadas; credenciales protegidas con PBKDF2.");
         } catch (IOException e) {
-            System.out.println("[Usuarios] Error al cargar el archivo CSV: " + e.getMessage());
+            System.err.println("[Usuarios] Error al cargar el archivo CSV: " + e.getMessage());
         }
     }
 
-    /**
-     * Comprueba si un nombre de usuario ya se encuentra registrado en el sistema.
-     * @param nombre Cadena con el identificador del usuario.
-     * @return true si el usuario existe, false en caso contrario.
-     */
     @Override
     public boolean existeUsuario(String nombre) {
         return usuariosRegistrados.containsKey(nombre);
     }
 
-    /**
-     * Comprueba si una clave de acceso numérica ya está asignada a algún usuario.
-     * @param clave Cadena de cuatro dígitos autogenerada.
-     * @return true si la clave ya está en uso, false si está libre.
-     */
-    @Override
-    public boolean existeClave(String clave) {
-        return usuariosRegistrados.containsValue(clave);
-    }
-
-    /**
-     * Valida si la combinación de usuario y clave coincide con los registros almacenados.
-     * @param nombre Identificador del usuario.
-     * @param clave Clave de acceso del sistema.
-     * @return true si las credenciales son válidas, false si fallan.
-     */
     @Override
     public boolean validarCredenciales(String nombre, String clave) {
-        return existeUsuario(nombre) && usuariosRegistrados.get(nombre).equals(clave);
+        String almacenada = usuariosRegistrados.get(nombre);
+        if (almacenada == null) return false;
+        if (SeguridadCredenciales.esHash(almacenada)) return SeguridadCredenciales.verificar(clave, almacenada);
+
+        // Compatibilidad defensiva por si aparece un CSV legado tras el arranque.
+        if (!almacenada.equals(clave)) return false;
+        synchronized (this) {
+            if (almacenada.equals(usuariosRegistrados.get(nombre))) {
+                usuariosRegistrados.put(nombre, SeguridadCredenciales.hash(clave, true));
+                persistir();
+            }
+        }
+        return true;
     }
 
-    /**
-     * Registra un nuevo usuario en la estructura de memoria viva y añade la línea al archivo CSV.
-     * @param nombre Identificador elegido por el usuario.
-     * @param clave Código numérico asignado por el servidor.
-     */
     @Override
-    public void registrarUsuario(String nombre, String clave) {
-        usuariosRegistrados.put(nombre, clave);
-        try (PrintWriter pw = new PrintWriter(new FileWriter(ARCHIVO_USUARIOS, true))) {
-            pw.println(nombre + "," + clave);
+    public synchronized boolean registrarUsuario(String nombre, String clave) {
+        if (!claveValida(clave) || usuariosRegistrados.containsKey(nombre)) return false;
+        usuariosRegistrados.put(nombre, SeguridadCredenciales.hash(clave, false));
+        try {
+            persistir();
+            return true;
+        } catch (IllegalStateException e) {
+            usuariosRegistrados.remove(nombre);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean requiereCambioClave(String nombre) {
+        return SeguridadCredenciales.requiereCambio(usuariosRegistrados.get(nombre));
+    }
+
+    @Override
+    public synchronized boolean cambiarClave(String nombre, String clave) {
+        if (!claveValida(clave) || !usuariosRegistrados.containsKey(nombre)) return false;
+        String anterior = usuariosRegistrados.put(nombre, SeguridadCredenciales.hash(clave, false));
+        try {
+            persistir();
+            return true;
+        } catch (IllegalStateException e) {
+            usuariosRegistrados.put(nombre, anterior);
+            return false;
+        }
+    }
+
+    private boolean claveValida(String clave) {
+        return clave != null && clave.length() >= 12 && clave.indexOf('|') < 0 && clave.indexOf(',') < 0
+                && clave.indexOf('\n') < 0 && clave.indexOf('\r') < 0;
+    }
+
+    @Override
+    public java.util.Set<String> listarUsuarios() {
+        return new TreeSet<>(usuariosRegistrados.keySet());
+    }
+
+    private void persistir() {
+        Path temporal = ARCHIVO_USUARIOS.resolveSibling(ARCHIVO_USUARIOS.getFileName() + ".tmp");
+        List<String> lineas = new ArrayList<>();
+        for (Map.Entry<String, String> entrada : new TreeMap<>(usuariosRegistrados).entrySet()) {
+            lineas.add(entrada.getKey() + "," + entrada.getValue());
+        }
+        try {
+            Files.write(temporal, lineas, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporal, ARCHIVO_USUARIOS, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporal, ARCHIVO_USUARIOS, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
-            System.err.println("[Usuarios] Error de escritura en CSV: " + e.getMessage());
+            try { Files.deleteIfExists(temporal); } catch (IOException ignorada) {}
+            throw new IllegalStateException("No se pudo guardar usuarios.csv.", e);
         }
     }
 }

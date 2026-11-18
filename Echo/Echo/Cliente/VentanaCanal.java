@@ -1,89 +1,121 @@
 package Cliente;
 
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.JLabel;
 
-/**
- * Terminal principal del sistema de chat encargada de orquestar el login, 
- * renderizar la consola del sistema, enrutar las ventanas secundarias y procesar los avisos.
- */
+/** Ventana visual para conversar en un canal público o privado de Echo. */
 public class VentanaCanal extends JFrame {
-    private JTextArea areaChat;
-    private JTextField campoMensaje;
-    private String nombreCanal; 
-    private ConexionServidor conexion;
-    private int mensajesHistorialCargados = 0; 
+    private final JTextArea areaChat = new JTextArea();
+    private final JTextField campoMensaje = new JTextField();
+    private final String nombreCanal;
+    private final ConexionServidor conexion;
+    private final Runnable alCerrar;
+    private int mensajesHistorialCargados = 0;
+    private JButton botonHistorial;
 
     public VentanaCanal(String nombreCanal, ConexionServidor conexion, Runnable alCerrar) {
         this.nombreCanal = nombreCanal;
         this.conexion = conexion;
+        this.alCerrar = alCerrar;
 
-        setSize(450, 400);
-        setLayout(new BorderLayout());
-        
-        // Al cerrar la ventana, el JFrame se destruye por completo limpiando la RAM
+        boolean privado = nombreCanal.startsWith("Priv_");
+        String titulo = privado ? "Conversación con " + nombreCanal.substring(5) : nombreCanal;
+        setTitle(titulo + " · Echo");
+        setSize(680, 520);
+        setMinimumSize(new Dimension(520, 400));
+        setLocationByPlatform(true);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        if (nombreCanal.startsWith("Priv_")) {
-            setTitle("Chat privado con " + nombreCanal.substring(5));
-            // EN PRIVADOS NO SE CREA EL BOTÓN NI SE SOLICITA HISTORIAL
-        } else {
-            setTitle("Salón: " + nombreCanal);
-            
-            // EL BOTÓN SOLO EXISTE Y SE MUESTRA EN LOS SALONES PÚBLICOS
-            JPanel panelSuperior = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            JButton btnHistorial = new JButton("Cargar mensajes");
-            
-            btnHistorial.addActionListener(e -> {
-                if (mensajesHistorialCargados >= 150) {
-                    JOptionPane.showMessageDialog(this, "Has alcanzado el límite máximo de 150 mensajes históricos.", "Límite Alcanzado", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                conexion.enviarComando("GET_HIST|" + nombreCanal + "|" + mensajesHistorialCargados);
-                mensajesHistorialCargados += 50;
-            });
-            panelSuperior.add(btnHistorial);
-            add(panelSuperior, BorderLayout.NORTH);
+        JPanel contenido = new JPanel(new BorderLayout(14, 14));
+        contenido.setBackground(EchoTheme.FONDO);
+        contenido.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
+        setContentPane(contenido);
+
+        JPanel encabezado = EchoTheme.glassPanel();
+        encabezado.setLayout(new BorderLayout(10, 4));
+        encabezado.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+        JLabel etiquetaTitulo = new JLabel(titulo);
+        etiquetaTitulo.setForeground(EchoTheme.TEXTO);
+        etiquetaTitulo.setFont(etiquetaTitulo.getFont().deriveFont(Font.BOLD, 19f));
+        JLabel etiquetaTipo = new JLabel(privado ? "MENSAJE DIRECTO" : "CANAL DE ECHO");
+        etiquetaTipo.setForeground(EchoTheme.TEXTO_SUAVE);
+        etiquetaTipo.setFont(etiquetaTipo.getFont().deriveFont(Font.BOLD, 10f));
+        encabezado.add(etiquetaTitulo, BorderLayout.CENTER);
+        encabezado.add(etiquetaTipo, BorderLayout.EAST);
+
+        if (!privado) {
+            botonHistorial = EchoTheme.button("Cargar anteriores");
+            botonHistorial.addActionListener(e -> cargarHistorial());
+            encabezado.add(botonHistorial, BorderLayout.SOUTH);
         }
-        
-        areaChat = new JTextArea();
+        contenido.add(encabezado, BorderLayout.NORTH);
+
+        JPanel panelMensajes = EchoTheme.glassPanel();
+        panelMensajes.setLayout(new BorderLayout());
+        panelMensajes.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
         areaChat.setEditable(false);
-        add(new JScrollPane(areaChat), BorderLayout.CENTER);
+        areaChat.setLineWrap(true);
+        areaChat.setWrapStyleWord(true);
+        EchoTheme.styleArea(areaChat);
+        JScrollPane scrollMensajes = new JScrollPane(areaChat);
+        scrollMensajes.setBorder(null);
+        scrollMensajes.getViewport().setBackground(new java.awt.Color(17, 23, 40));
+        panelMensajes.add(scrollMensajes, BorderLayout.CENTER);
+        contenido.add(panelMensajes, BorderLayout.CENTER);
 
-        JPanel panelInferior = new JPanel(new BorderLayout());
-        campoMensaje = new JTextField();
-        JButton btnEnviar = new JButton("Enviar");
+        JPanel panelEnviar = EchoTheme.glassPanel();
+        panelEnviar.setLayout(new BorderLayout(10, 0));
+        panelEnviar.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        EchoTheme.styleField(campoMensaje);
+        campoMensaje.setToolTipText("Escribe un mensaje");
+        JButton botonEnviar = EchoTheme.button("Enviar");
+        panelEnviar.add(campoMensaje, BorderLayout.CENTER);
+        panelEnviar.add(botonEnviar, BorderLayout.EAST);
+        contenido.add(panelEnviar, BorderLayout.SOUTH);
 
-        panelInferior.add(campoMensaje, BorderLayout.CENTER);
-        panelInferior.add(btnEnviar, BorderLayout.EAST);
-        add(panelInferior, BorderLayout.SOUTH);
-
-        java.awt.event.ActionListener accionEnviar = e -> enviarMensaje();
-        btnEnviar.addActionListener(accionEnviar);
-        campoMensaje.addActionListener(accionEnviar);
-
+        botonEnviar.addActionListener(e -> enviarMensaje());
+        campoMensaje.addActionListener(e -> enviarMensaje());
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent e) {
-                alCerrar.run(); // Notifica a la ventana principal para sacarlo de ventanasAbiertas
+                VentanaCanal.this.alCerrar.run();
             }
         });
     }
 
-    private void enviarMensaje() {
-        String txt = campoMensaje.getText().trim();
-        if (!txt.isEmpty()) {
-            if (nombreCanal.startsWith("Priv_")) {
-                String destino = nombreCanal.substring(5);
-                conexion.enviarComando("MSG_PRIV|" + destino + "|" + txt);
-                mostrarMensaje("Tú: " + txt);
-            } else {
-                conexion.enviarComando("MSG_ROOM|" + nombreCanal + "|" + txt);
-            }
-            campoMensaje.setText("");
+    private void cargarHistorial() {
+        if (mensajesHistorialCargados >= 150) {
+            botonHistorial.setEnabled(false);
+            return;
         }
+        conexion.enviarComando("GET_HIST|" + nombreCanal + "|" + mensajesHistorialCargados);
+        mensajesHistorialCargados += 50;
+        if (mensajesHistorialCargados >= 150) botonHistorial.setEnabled(false);
+    }
+
+    private void enviarMensaje() {
+        String texto = campoMensaje.getText().trim();
+        if (texto.isEmpty()) return;
+
+        if (nombreCanal.startsWith("Priv_")) {
+            String destino = nombreCanal.substring(5);
+            conexion.enviarComando("MSG_PRIV|" + destino + "|" + texto);
+            mostrarMensaje("Tú: " + texto);
+        } else {
+            conexion.enviarComando("MSG_ROOM|" + nombreCanal + "|" + texto);
+        }
+        campoMensaje.setText("");
     }
 
     public void mostrarMensaje(String mensaje) {
